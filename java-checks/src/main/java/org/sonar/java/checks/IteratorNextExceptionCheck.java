@@ -20,9 +20,13 @@
 package org.sonar.java.checks;
 
 import com.google.common.collect.ImmutableList;
+
 import org.sonar.check.Rule;
+import org.sonar.java.checks.helpers.MethodsHelper;
 import org.sonar.java.matcher.MethodMatcher;
 import org.sonar.java.matcher.TypeCriteria;
+import org.sonar.java.resolve.JavaType;
+import org.sonar.java.resolve.MethodJavaType;
 import org.sonar.plugins.java.api.IssuableSubscriptionVisitor;
 import org.sonar.plugins.java.api.semantic.Symbol;
 import org.sonar.plugins.java.api.semantic.Type;
@@ -95,18 +99,20 @@ public class IteratorNextExceptionCheck extends IssuableSubscriptionVisitor {
       super.visitMethodInvocation(methodInvocation);
     }
 
-    public boolean throwsNoSuchElementException(MethodInvocationTree methodInvocationTree) {
+    private static boolean throwsNoSuchElementException(MethodInvocationTree methodInvocationTree) {
       Symbol symbol = methodInvocationTree.symbol();
       if (!symbol.isMethodSymbol()) {
         return false;
       }
-      Symbol.MethodSymbol methodSymbol = (Symbol.MethodSymbol) symbol;
-      for (Type thrownType : methodSymbol.thrownTypes()) {
-        if (thrownType.is("java.util.NoSuchElementException")) {
-          return true;
-        }
+      if (throwsNoSuchElementException(((Symbol.MethodSymbol) symbol).thrownTypes())) {
+        return true;
       }
-      return false;
+      JavaType methodType = (JavaType) MethodsHelper.methodName(methodInvocationTree).symbolType();
+      return methodType.isTagged(JavaType.METHOD) && throwsNoSuchElementException(((MethodJavaType) methodType).thrownTypes());
+    }
+
+    private static boolean throwsNoSuchElementException(List<? extends Type> thrownTypes) {
+      return thrownTypes.stream().anyMatch(t -> t.is("java.util.NoSuchElementException"));
     }
 
   }
